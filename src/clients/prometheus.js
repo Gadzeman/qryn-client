@@ -21,7 +21,7 @@ class Read {
     return this.service.request('/api/v1/query', {
       method: 'POST',
       headers: this.headers(),
-      body: { query }
+      body: new URLSearchParams({ query })
     }).catch(error => {
       if (error instanceof GigapipeError) {
         throw error;
