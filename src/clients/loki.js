@@ -62,11 +62,11 @@ class Loki {
    * @param {number} [options.end] - The end timestamp in nanoseconds (Unix epoch).
    * @param {boolean} [options.parse=false] - If true, returns parsed logs array instead of raw response.
    * @returns {Promise<QrynResponse|Array>} A promise that resolves to the response from the query endpoint, or parsed logs array if parse option is true.
-   * @throws {QrynError} If the query request fails.
+   * @throws {GigapipeError} If the query request fails.
    */
   async query(query, options = {}) {
     if (!query) {
-      throw new QrynError('Query parameter is required');
+      throw new GigapipeError('Query parameter is required');
     }
 
     const params = new URLSearchParams({ query });
@@ -78,10 +78,10 @@ class Loki {
       method: 'GET',
       headers: this.headers(options)
     }).catch(error => {
-      if (error instanceof QrynError) {
+      if (error instanceof GigapipeError) {
         throw error;
       }
-      throw new QrynError(`Loki query failed: ${error.message}`, error.statusCode);
+      throw new GigapipeError(`Loki query failed: ${error.message}`, error.statusCode);
     });
 
     if (options.parse) {
@@ -102,14 +102,14 @@ class Loki {
    * @param {number} [options.limit] - The maximum number of entries to return.
    * @param {boolean} [options.parse=false] - If true, returns parsed logs array instead of raw response.
    * @returns {Promise<QrynResponse|Array>} A promise that resolves to the response from the query range endpoint, or parsed logs array if parse option is true.
-   * @throws {QrynError} If the query range request fails.
+   * @throws {GigapipeError} If the query range request fails.
    */
   async queryRange(query, start, end, options = {}) {
     if (!query) {
-      throw new QrynError('Query parameter is required');
+      throw new GigapipeError('Query parameter is required');
     }
     if (!start || !end) {
-      throw new QrynError('Start and end timestamps are required');
+      throw new GigapipeError('Start and end timestamps are required');
     }
 
     const params = new URLSearchParams({ query, start, end });
@@ -120,10 +120,10 @@ class Loki {
       method: 'GET',
       headers: this.headers(options)
     }).catch(error => {
-      if (error instanceof QrynError) {
+      if (error instanceof GigapipeError) {
         throw error;
       }
-      throw new QrynError(`Loki query range failed: ${error.message}`, error.statusCode);
+      throw new GigapipeError(`Loki query range failed: ${error.message}`, error.statusCode);
     });
 
     if (options.parse) {
@@ -140,7 +140,7 @@ class Loki {
    * @param {number} [options.start] - The start timestamp in nanoseconds (Unix epoch).
    * @param {number} [options.end] - The end timestamp in nanoseconds (Unix epoch).
    * @returns {Promise<QrynResponse>} A promise that resolves to the response from the labels endpoint.
-   * @throws {QrynError} If the labels request fails.
+   * @throws {GigapipeError} If the labels request fails.
    */
   async labels(options = {}) {
     const params = new URLSearchParams();
@@ -154,10 +154,10 @@ class Loki {
       method: 'GET',
       headers: this.headers(options)
     }).catch(error => {
-      if (error instanceof QrynError) {
+      if (error instanceof GigapipeError) {
         throw error;
       }
-      throw new QrynError(`Loki labels retrieval failed: ${error.message}`, error.statusCode);
+      throw new GigapipeError(`Loki labels retrieval failed: ${error.message}`, error.statusCode);
     });
   }
 
@@ -169,11 +169,11 @@ class Loki {
    * @param {number} [options.start] - The start timestamp in nanoseconds (Unix epoch).
    * @param {number} [options.end] - The end timestamp in nanoseconds (Unix epoch).
    * @returns {Promise<QrynResponse>} A promise that resolves to the response from the label values endpoint.
-   * @throws {QrynError} If the label values request fails.
+   * @throws {GigapipeError} If the label values request fails.
    */
   async labelValues(labelName, options = {}) {
     if (!labelName) {
-      throw new QrynError('Label name parameter is required');
+      throw new GigapipeError('Label name parameter is required');
     }
 
     const params = new URLSearchParams();
@@ -187,10 +187,10 @@ class Loki {
       method: 'GET',
       headers: this.headers(options)
     }).catch(error => {
-      if (error instanceof QrynError) {
+      if (error instanceof GigapipeError) {
         throw error;
       }
-      throw new QrynError(`Loki label values retrieval failed: ${error.message}`, error.statusCode);
+      throw new GigapipeError(`Loki label values retrieval failed: ${error.message}`, error.statusCode);
     });
   }
 
@@ -202,11 +202,11 @@ class Loki {
    * @param {number} [options.start] - The start timestamp in nanoseconds (Unix epoch).
    * @param {number} [options.end] - The end timestamp in nanoseconds (Unix epoch).
    * @returns {Promise<QrynResponse>} A promise that resolves to the response from the series endpoint.
-   * @throws {QrynError} If the series request fails.
+   * @throws {GigapipeError} If the series request fails.
    */
   async series(match, options = {}) {
     if (!match) {
-      throw new QrynError('Match parameter is required');
+      throw new GigapipeError('Match parameter is required');
     }
 
     const params = new URLSearchParams();
@@ -218,17 +218,17 @@ class Loki {
     } else if (Array.isArray(match)) {
       match.forEach(m => params.append('match[]', m));
     } else {
-      throw new QrynError('Match must be a string or array of strings');
+      throw new GigapipeError('Match must be a string or array of strings');
     }
 
     return this.service.request(`/loki/api/v1/series?${params.toString()}`, {
       method: 'GET',
       headers: this.headers(options)
     }).catch(error => {
-      if (error instanceof QrynError) {
+      if (error instanceof GigapipeError) {
         throw error;
       }
-      throw new QrynError(`Loki series retrieval failed: ${error.message}`, error.statusCode);
+      throw new GigapipeError(`Loki series retrieval failed: ${error.message}`, error.statusCode);
     });
   }
 
