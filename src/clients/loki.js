@@ -2,6 +2,194 @@ const { GigapipeError } = require('../types');
 const { Stream } = require('../models');
 const Http = require('../services/http');
 
+class Read {
+  constructor(service, options) {
+    this.service = service;
+    this.options = options;
+  }
+
+  /**
+   * Execute a LogQL query and retrieve log results.
+   * @param {string} query - The LogQL query string.
+   * @param {Object} [queryOptions={}] - Additional options for the query.
+   * @param {number} [queryOptions.limit] - The maximum number of entries to return.
+   * @param {number} [queryOptions.start] - The start timestamp in nanoseconds (Unix epoch).
+   * @param {number} [queryOptions.end] - The end timestamp in nanoseconds (Unix epoch).
+   * @param {boolean} [queryOptions.parse=false] - If true, returns parsed logs array instead of raw response.
+   * @returns {Promise<GigapipeResponse|Array>} A promise that resolves to the response from the query endpoint, or parsed logs array if parse option is true.
+   * @throws {GigapipeError} If the query request fails.
+   */
+  async query(query, queryOptions = {}) {
+    if (!query) {
+      throw new GigapipeError('Query parameter is required');
+    }
+
+    const params = new URLSearchParams({ query });
+    if (queryOptions.limit) params.append('limit', queryOptions.limit);
+    if (queryOptions.start) params.append('start', queryOptions.start);
+    if (queryOptions.end) params.append('end', queryOptions.end);
+
+    const result = await this.service.request(`/loki/api/v1/query?${params.toString()}`, {
+      method: 'GET',
+      headers: this.headers()
+    }).catch(error => {
+      if (error instanceof GigapipeError) {
+        throw error;
+      }
+      throw new GigapipeError(`Loki query failed: ${error.message}`, error.statusCode);
+    });
+
+    if (queryOptions.parse) {
+      return Loki.parseLogs(result);
+    }
+
+    return result;
+  }
+
+  /**
+   * Execute a LogQL query over a range of time.
+   * @param {string} query - The LogQL query string.
+   * @param {number} start - The start timestamp in nanoseconds (Unix epoch).
+   * @param {number} end - The end timestamp in nanoseconds (Unix epoch).
+   * @param {Object} [queryOptions={}] - Additional options for the query.
+   * @param {number} [queryOptions.step] - The query resolution step width in nanoseconds.
+   * @param {number} [queryOptions.limit] - The maximum number of entries to return.
+   * @param {boolean} [queryOptions.parse=false] - If true, returns parsed logs array instead of raw response.
+   * @returns {Promise<GigapipeResponse|Array>} A promise that resolves to the response from the query range endpoint, or parsed logs array if parse option is true.
+   * @throws {GigapipeError} If the query range request fails.
+   */
+  async queryRange(query, start, end, queryOptions = {}) {
+    if (!query) {
+      throw new GigapipeError('Query parameter is required');
+    }
+    if (!start || !end) {
+      throw new GigapipeError('Start and end timestamps are required');
+    }
+
+    const params = new URLSearchParams({ query, start, end });
+    if (queryOptions.step) params.append('step', queryOptions.step);
+    if (queryOptions.limit) params.append('limit', queryOptions.limit);
+
+    const result = await this.service.request(`/loki/api/v1/query_range?${params.toString()}`, {
+      method: 'GET',
+      headers: this.headers()
+    }).catch(error => {
+      if (error instanceof GigapipeError) {
+        throw error;
+      }
+      throw new GigapipeError(`Loki query range failed: ${error.message}`, error.statusCode);
+    });
+
+    if (queryOptions.parse) {
+      return Loki.parseLogs(result);
+    }
+
+    return result;
+  }
+
+  /**
+   * Retrieve the list of label names.
+   * @param {Object} [queryOptions={}] - Additional options for the request.
+   * @param {number} [queryOptions.start] - The start timestamp in nanoseconds (Unix epoch).
+   * @param {number} [queryOptions.end] - The end timestamp in nanoseconds (Unix epoch).
+   * @returns {Promise<GigapipeResponse>} A promise that resolves to the response from the labels endpoint.
+   * @throws {GigapipeError} If the labels request fails.
+   */
+  async labels(queryOptions = {}) {
+    const params = new URLSearchParams();
+    if (queryOptions.start) params.append('start', queryOptions.start);
+    if (queryOptions.end) params.append('end', queryOptions.end);
+
+    const queryString = params.toString();
+    const url = `/loki/api/v1/labels${queryString ? `?${queryString}` : ''}`;
+
+    return this.service.request(url, {
+      method: 'GET',
+      headers: this.headers()
+    }).catch(error => {
+      if (error instanceof GigapipeError) {
+        throw error;
+      }
+      throw new GigapipeError(`Loki labels retrieval failed: ${error.message}`, error.statusCode);
+    });
+  }
+
+  /**
+   * Retrieve the list of label values for a specific label name.
+   * @param {string} labelName - The name of the label.
+   * @param {Object} [queryOptions={}] - Additional options for the request.
+   * @param {number} [queryOptions.start] - The start timestamp in nanoseconds (Unix epoch).
+   * @param {number} [queryOptions.end] - The end timestamp in nanoseconds (Unix epoch).
+   * @returns {Promise<GigapipeResponse>} A promise that resolves to the response from the label values endpoint.
+   * @throws {GigapipeError} If the label values request fails.
+   */
+  async labelValues(labelName, queryOptions = {}) {
+    if (!labelName) {
+      throw new GigapipeError('Label name parameter is required');
+    }
+
+    const params = new URLSearchParams();
+    if (queryOptions.start) params.append('start', queryOptions.start);
+    if (queryOptions.end) params.append('end', queryOptions.end);
+
+    const queryString = params.toString();
+    const url = `/loki/api/v1/label/${labelName}/values${queryString ? `?${queryString}` : ''}`;
+
+    return this.service.request(url, {
+      method: 'GET',
+      headers: this.headers()
+    }).catch(error => {
+      if (error instanceof GigapipeError) {
+        throw error;
+      }
+      throw new GigapipeError(`Loki label values retrieval failed: ${error.message}`, error.statusCode);
+    });
+  }
+
+  /**
+   * Retrieve the list of series that match a specified label set.
+   * @param {string[]|string} match - The label matchers (e.g., ['{job="api"}', '{env="prod"}'] or '{job="api"}')
+   * @param {Object} [queryOptions={}] - Additional options for the request.
+   * @param {number} [queryOptions.start] - The start timestamp in nanoseconds (Unix epoch).
+   * @param {number} [queryOptions.end] - The end timestamp in nanoseconds (Unix epoch).
+   * @returns {Promise<GigapipeResponse>} A promise that resolves to the response from the series endpoint.
+   * @throws {GigapipeError} If the series request fails.
+   */
+  async series(match, queryOptions = {}) {
+    if (!match) {
+      throw new GigapipeError('Match parameter is required');
+    }
+
+    const params = new URLSearchParams();
+    if (queryOptions.start) params.append('start', queryOptions.start);
+    if (queryOptions.end) params.append('end', queryOptions.end);
+
+    if (typeof match === 'string') {
+      params.append('match[]', match);
+    } else if (Array.isArray(match)) {
+      match.forEach(m => params.append('match[]', m));
+    } else {
+      throw new GigapipeError('Match must be a string or array of strings');
+    }
+
+    return this.service.request(`/loki/api/v1/series?${params.toString()}`, {
+      method: 'GET',
+      headers: this.headers()
+    }).catch(error => {
+      if (error instanceof GigapipeError) {
+        throw error;
+      }
+      throw new GigapipeError(`Loki series retrieval failed: ${error.message}`, error.statusCode);
+    });
+  }
+
+  headers() {
+    const headers = {};
+    if (this.options.orgId) headers['X-Scope-OrgID'] = this.options.orgId;
+    return headers;
+  }
+}
+
 class Loki {
   /**
    * Create a new Loki instance.
@@ -53,183 +241,13 @@ class Loki {
   }
 
   /**
-   * Execute a LogQL query and retrieve log results.
-   * @param {string} query - The LogQL query string.
-   * @param {Object} options - Additional options for the request.
-   * @param {string} [options.orgId] - The organization ID for the request.
-   * @param {number} [options.limit] - The maximum number of entries to return.
-   * @param {number} [options.start] - The start timestamp in nanoseconds (Unix epoch).
-   * @param {number} [options.end] - The end timestamp in nanoseconds (Unix epoch).
-   * @param {boolean} [options.parse=false] - If true, returns parsed logs array instead of raw response.
-   * @returns {Promise<GigapipeResponse|Array>} A promise that resolves to the response from the query endpoint, or parsed logs array if parse option is true.
-   * @throws {GigapipeError} If the query request fails.
+   * Create a new Read instance for reading logs from Loki.
+   * @param {Object} options - Options for the read operation.
+   * @param {string} [options.orgId] - The organization ID to include in the request headers.
+   * @returns {Read} A new Read instance.
    */
-  async query(query, options = {}) {
-    if (!query) {
-      throw new GigapipeError('Query parameter is required');
-    }
-
-    const params = new URLSearchParams({ query });
-    if (options.limit) params.append('limit', options.limit);
-    if (options.start) params.append('start', options.start);
-    if (options.end) params.append('end', options.end);
-
-    const result = await this.service.request(`/loki/api/v1/query?${params.toString()}`, {
-      method: 'GET',
-      headers: this.headers(options)
-    }).catch(error => {
-      if (error instanceof GigapipeError) {
-        throw error;
-      }
-      throw new GigapipeError(`Loki query failed: ${error.message}`, error.statusCode);
-    });
-
-    if (options.parse) {
-      return Loki.parseLogs(result);
-    }
-
-    return result;
-  }
-
-  /**
-   * Execute a LogQL query over a range of time.
-   * @param {string} query - The LogQL query string.
-   * @param {number} start - The start timestamp in nanoseconds (Unix epoch).
-   * @param {number} end - The end timestamp in nanoseconds (Unix epoch).
-   * @param {Object} options - Additional options for the request.
-   * @param {string} [options.orgId] - The organization ID for the request.
-   * @param {number} [options.step] - The query resolution step width in nanoseconds.
-   * @param {number} [options.limit] - The maximum number of entries to return.
-   * @param {boolean} [options.parse=false] - If true, returns parsed logs array instead of raw response.
-   * @returns {Promise<QrynResponse|Array>} A promise that resolves to the response from the query range endpoint, or parsed logs array if parse option is true.
-   * @throws {GigapipeError} If the query range request fails.
-   */
-  async queryRange(query, start, end, options = {}) {
-    if (!query) {
-      throw new GigapipeError('Query parameter is required');
-    }
-    if (!start || !end) {
-      throw new GigapipeError('Start and end timestamps are required');
-    }
-
-    const params = new URLSearchParams({ query, start, end });
-    if (options.step) params.append('step', options.step);
-    if (options.limit) params.append('limit', options.limit);
-
-    const result = await this.service.request(`/loki/api/v1/query_range?${params.toString()}`, {
-      method: 'GET',
-      headers: this.headers(options)
-    }).catch(error => {
-      if (error instanceof GigapipeError) {
-        throw error;
-      }
-      throw new GigapipeError(`Loki query range failed: ${error.message}`, error.statusCode);
-    });
-
-    if (options.parse) {
-      return Loki.parseLogs(result);
-    }
-
-    return result;
-  }
-
-  /**
-   * Retrieve the list of label names.
-   * @param {Object} options - Additional options for the request.
-   * @param {string} [options.orgId] - The organization ID for the request.
-   * @param {number} [options.start] - The start timestamp in nanoseconds (Unix epoch).
-   * @param {number} [options.end] - The end timestamp in nanoseconds (Unix epoch).
-   * @returns {Promise<GigapipeResponse>} A promise that resolves to the response from the labels endpoint.
-   * @throws {GigapipeError} If the labels request fails.
-   */
-  async labels(options = {}) {
-    const params = new URLSearchParams();
-    if (options.start) params.append('start', options.start);
-    if (options.end) params.append('end', options.end);
-
-    const queryString = params.toString();
-    const url = `/loki/api/v1/labels${queryString ? `?${queryString}` : ''}`;
-
-    return this.service.request(url, {
-      method: 'GET',
-      headers: this.headers(options)
-    }).catch(error => {
-      if (error instanceof GigapipeError) {
-        throw error;
-      }
-      throw new GigapipeError(`Loki labels retrieval failed: ${error.message}`, error.statusCode);
-    });
-  }
-
-  /**
-   * Retrieve the list of label values for a specific label name.
-   * @param {string} labelName - The name of the label.
-   * @param {Object} options - Additional options for the request.
-   * @param {string} [options.orgId] - The organization ID for the request.
-   * @param {number} [options.start] - The start timestamp in nanoseconds (Unix epoch).
-   * @param {number} [options.end] - The end timestamp in nanoseconds (Unix epoch).
-   * @returns {Promise<QrynResponse>} A promise that resolves to the response from the label values endpoint.
-   * @throws {GigapipeError} If the label values request fails.
-   */
-  async labelValues(labelName, options = {}) {
-    if (!labelName) {
-      throw new GigapipeError('Label name parameter is required');
-    }
-
-    const params = new URLSearchParams();
-    if (options.start) params.append('start', options.start);
-    if (options.end) params.append('end', options.end);
-
-    const queryString = params.toString();
-    const url = `/loki/api/v1/label/${labelName}/values${queryString ? `?${queryString}` : ''}`;
-
-    return this.service.request(url, {
-      method: 'GET',
-      headers: this.headers(options)
-    }).catch(error => {
-      if (error instanceof GigapipeError) {
-        throw error;
-      }
-      throw new GigapipeError(`Loki label values retrieval failed: ${error.message}`, error.statusCode);
-    });
-  }
-
-  /**
-   * Retrieve the list of series that match a specified label set.
-   * @param {string[]|string} match - The label matchers (e.g., ['{job="api"}', '{env="prod"}'] or '{job="api"}')
-   * @param {Object} options - Additional options for the request.
-   * @param {string} [options.orgId] - The organization ID for the request.
-   * @param {number} [options.start] - The start timestamp in nanoseconds (Unix epoch).
-   * @param {number} [options.end] - The end timestamp in nanoseconds (Unix epoch).
-   * @returns {Promise<QrynResponse>} A promise that resolves to the response from the series endpoint.
-   * @throws {GigapipeError} If the series request fails.
-   */
-  async series(match, options = {}) {
-    if (!match) {
-      throw new GigapipeError('Match parameter is required');
-    }
-
-    const params = new URLSearchParams();
-    if (options.start) params.append('start', options.start);
-    if (options.end) params.append('end', options.end);
-
-    if (typeof match === 'string') {
-      params.append('match[]', match);
-    } else if (Array.isArray(match)) {
-      match.forEach(m => params.append('match[]', m));
-    } else {
-      throw new GigapipeError('Match must be a string or array of strings');
-    }
-
-    return this.service.request(`/loki/api/v1/series?${params.toString()}`, {
-      method: 'GET',
-      headers: this.headers(options)
-    }).catch(error => {
-      if (error instanceof GigapipeError) {
-        throw error;
-      }
-      throw new GigapipeError(`Loki series retrieval failed: ${error.message}`, error.statusCode);
-    });
+  createReader(options) {
+    return new Read(this.service, options);
   }
 
   /**
