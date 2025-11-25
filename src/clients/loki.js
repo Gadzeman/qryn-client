@@ -61,7 +61,7 @@ class Loki {
    * @param {number} [options.start] - The start timestamp in nanoseconds (Unix epoch).
    * @param {number} [options.end] - The end timestamp in nanoseconds (Unix epoch).
    * @param {boolean} [options.parse=false] - If true, returns parsed logs array instead of raw response.
-   * @returns {Promise<QrynResponse|Array>} A promise that resolves to the response from the query endpoint, or parsed logs array if parse option is true.
+   * @returns {Promise<GigapipeResponse|Array>} A promise that resolves to the response from the query endpoint, or parsed logs array if parse option is true.
    * @throws {GigapipeError} If the query request fails.
    */
   async query(query, options = {}) {
@@ -139,7 +139,7 @@ class Loki {
    * @param {string} [options.orgId] - The organization ID for the request.
    * @param {number} [options.start] - The start timestamp in nanoseconds (Unix epoch).
    * @param {number} [options.end] - The end timestamp in nanoseconds (Unix epoch).
-   * @returns {Promise<QrynResponse>} A promise that resolves to the response from the labels endpoint.
+   * @returns {Promise<GigapipeResponse>} A promise that resolves to the response from the labels endpoint.
    * @throws {GigapipeError} If the labels request fails.
    */
   async labels(options = {}) {
@@ -235,7 +235,7 @@ class Loki {
   /**
    * Parse query or queryRange result and extract all logs as a flat array.
    * Works with both "streams" (query) and "matrix" (queryRange) result types.
-   * @param {QrynResponse} result - The response from query or queryRange.
+   * @param {GigapipeResponse} result - The response from query or queryRange.
    * @returns {Array} Array of log objects with timestamp, date, and message (always parsed).
    */
   parseLogs(result) {
@@ -245,7 +245,7 @@ class Loki {
   /**
    * Static method to parse query or queryRange result and extract all logs as a flat array.
    * Works with both "streams" (query) and "matrix" (queryRange) result types.
-   * @param {QrynResponse} result - The response from query or queryRange.
+   * @param {GigapipeResponse} result - The response from query or queryRange.
    * @returns {Array} Array of log objects with timestamp, date, and message (always parsed).
    */
   static parseLogs(result) {
